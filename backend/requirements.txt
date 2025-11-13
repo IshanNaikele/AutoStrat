@@ -1,0 +1,19 @@
+# --- The API Server ---
+fastapi
+uvicorn
+
+# --- The Brain (LLM) ---
+langchain-google-genai
+python-dotenv
+
+# --- The Agent Logic ---
+langgraph
+langchain
+langchain-core
+langchain-community
+
+# --- The Tools (Search) ---
+tavily-python
+langchain-tavily
+
+IPython
