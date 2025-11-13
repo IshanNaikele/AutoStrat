@@ -112,5 +112,4 @@ workflow.add_edge("strategist", END)
 # Compile
 graph_app = workflow.compile()
 
-from IPython.display import Image
-(Image(graph_app.get_graph().draw_mermaid_png()))
+ 

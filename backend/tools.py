@@ -10,8 +10,8 @@ def get_search_tool():
         raise ValueError("TAVILY_API_KEY not found in .env file")
         
     return TavilySearch(
-        max_results=5,              # 5 High-quality results is better than 10 low-quality ones
-        search_depth="advanced",    # <--- Forces Tavily to scrape deeper
-        include_raw_content=True,   # <--- Fetches the FULL article text, not just a snippet
-        include_answer=True         # <--- Asks Tavily to generate a direct answer too)
+        max_results=5,               
+        search_depth="advanced",     
+        include_raw_content=True,    
+        include_answer=True         
     )
