@@ -12,24 +12,24 @@ app = FastAPI(title="AutoStrat API")
 # Structure: { "task_id": { "status": "processing", "result": None } }
 TASKS = {}
 
+# Inside backend/main.py (Update the run_agent_task function ONLY)
+
 def run_agent_task(task_id: str, topic: str):
-    """
-    The heavy lifting function running in the background.
-    """
     print(f"--> Starting background task {task_id} for: {topic}")
     try:
         input_msg = HumanMessage(content=topic)
-        
-        # Invoke the LangGraph application
-        # recursion_limit=20 prevents infinite search loops
         result = graph_app.invoke({"messages": [input_msg]}, config={"recursion_limit": 20})
         
-        final_content = result.get("final_report", "Error: No report generated.")
+        # CHANGED: Extract ALL layers of data
+        final_output = {
+            "research": result.get("research_data", "No research found."),
+            "analysis": result.get("analysis_data", "No analysis found."),
+            "report": result.get("final_report", "No report generated.")
+        }
         
-        # Update DB
         TASKS[task_id] = {
             "status": "completed",
-            "result": final_content
+            "result": final_output # Store the Dictionary
         }
         print(f"--> Task {task_id} COMPLETED.")
         
@@ -37,7 +37,7 @@ def run_agent_task(task_id: str, topic: str):
         print(f"--> Task {task_id} FAILED: {e}")
         TASKS[task_id] = {
             "status": "failed",
-            "result": str(e)
+            "result": {"error": str(e)}
         }
 
 @app.post("/generate-strategy", response_model=ResearchResponse)
@@ -77,3 +77,5 @@ async def get_status(task_id: str):
         status=task["status"],
         result=task["result"]
     )
+
+
