@@ -1,59 +1,51 @@
 import operator
-from typing import Annotated,TypedDict,List
+from typing import Annotated, List, TypedDict
 from datetime import datetime
-import os
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage,BaseMessage,HumanMessage
-from langgraph.graph import START,END,StateGraph
-from langgraph.prebuilt import ToolNode,tools_condition
 
-# For loading the API Key & other Credentials from the .env file 
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import SystemMessage, BaseMessage, HumanMessage
+from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode, tools_condition
 from dotenv import load_dotenv
-load_dotenv()
-GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
-# Import from other Files 
 from backend.tools import get_search_tool
 
-# For Using tool 
-tool=get_search_tool()
-tools=[tool]
+load_dotenv()
 
-# For Binding Tool with LLM 
-llm=ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0,api_key=GEMINI_API_KEY)
-llm_with_tools=llm.bind_tools(tools)
+# --- SETUP ---
+tool = get_search_tool()
+tools = [tool]
 
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+llm_with_tools = llm.bind_tools(tools)
 
+# --- HELPER FUNCTION ---
 def parse_gemini_output(ai_message):
-    if isinstance(ai_message.content,str):
+    """Robustly handles Gemini's output (String vs List)."""
+    if isinstance(ai_message.content, str):
         return ai_message.content
-     
-    if isinstance(ai_message.content,list):
-        parts=[]
-        for part in ai_message.content :
-            if isinstance(part,dict) and 'text' in part:
+        
+    if isinstance(ai_message.content, list):
+        parts = []
+        for part in ai_message.content:
+            if isinstance(part, dict) and 'text' in part:
                 parts.append(part['text'])
-            elif isinstance(part,str):
+            elif isinstance(part, str):
                 parts.append(part)
-
         return " ".join(parts)
     
-    return  str(ai_message.content)
+    return str(ai_message.content)
 
-        
- # State Defination 
- 
-
+# --- STATE DEFINITION ---
 class AgentState(TypedDict):
     messages: Annotated[List[BaseMessage], operator.add]
-    research_data:str
-    analysis_data:str
-    final_data :str
+    research_data: str
+    analysis_data: str
+    final_report: str
 
+# --- NODES ---
 
 def researcher_node(state: AgentState):
-    print("="*80)
     print("👉 ENTERING: Researcher Node")
-    print("="*80)
     messages = state['messages']
     today = datetime.now().strftime("%B %d, %Y")
     
@@ -62,10 +54,10 @@ def researcher_node(state: AgentState):
     You are a Senior Market Researcher conducting comprehensive research.
 
 YOUR TASK:
-1. Use the search tool to find the TOP 5 most relevant and recent sources about this topic
+1. Use the search tool to find the TOP 10-15 most relevant and recent sources about this topic
 2. Focus on: research papers, news articles, industry reports, expert opinions, and emerging trends
 3. Search for: key statistics, market data, competing viewpoints, and real-world applications
-4. Prioritize sources from the last 6 months for current trends
+4. Prioritize sources from the last 6-12 months for current trends
 5. Look for both mainstream and specialized/technical sources
 
 OUTPUT FORMAT:
@@ -75,10 +67,6 @@ OUTPUT FORMAT:
 - Minimum 300 words of substantive research findings
     """)
     
-    print("="*80)
-    print(sys_msg)
-    print("="*80)
-
     response = llm_with_tools.invoke([sys_msg] + messages)
     
     # --- THE FIX FOR DISAPPEARING DATA ---
@@ -91,7 +79,6 @@ OUTPUT FORMAT:
     
     # If empty (tool call), just update messages, don't wipe research_data
     return {"messages": [response]}
-
 
 def analyst_node(state: AgentState):
     print("👉 ENTERING: Analyst Node") 
@@ -142,7 +129,6 @@ Minimum 400 words of analytical depth.
     print(f"   Analyst Generated: {len(clean_analysis)} chars") 
     
     return {"messages": [response], "analysis_data": clean_analysis}
-
 
 def strategist_node(state: AgentState):
     print("👉 ENTERING: Strategist Node")
@@ -207,8 +193,6 @@ FORMAT: Use markdown with proper headers (##, ###), bullet points, and *bold* fo
     
     return {"messages": [response], "final_report": clean_content}
 
-
-
 # --- BUILD GRAPH ---
 workflow = StateGraph(AgentState)
 workflow.add_node("researcher", researcher_node)
@@ -221,7 +205,7 @@ workflow.set_entry_point("researcher")
 workflow.add_conditional_edges(
     "researcher",
     tools_condition,
-    {"tools": "tools", "_end_": "analyst"}
+    {"tools": "tools", END: "analyst"}
 )
 
 workflow.add_edge("tools", "researcher")
